@@ -19,10 +19,10 @@ function Queue:new(size)
 end
 
 --Add and element to the Q, growing the Q size if needed.
-function Queue:add(msg)
+function Queue:add(element)
    self.updated = true
    if self.cascade then --If you have an overflow q, then add to that not this.
-      self.cascade:add(msg)
+      self.cascade:add(element)
       self.last_op = "add"
    else
       local add = (self.written + 1) % self.size
@@ -30,11 +30,11 @@ function Queue:add(msg)
       if self.last_op == "add" and add == self.read then
          --We have a problem, time to grow
          self.cascade = self:new(self.size * 2) --Make a new, bigger Q
-         self.cascade:add(msg)
+         self.cascade:add(element)
          self.last_op = "add"
          return
       end
-      self.elements[add] = msg
+      self.elements[add] = element
       self.written = add
       self.next_write = (self.written + 1) % self.size
       if self.next_write == 0 then self.next_write = self.size end
@@ -42,7 +42,7 @@ function Queue:add(msg)
    end
 end
 
-function Queue:grow(read_pos)
+function Queue:grow(read_pos) --Internal method. Probably shouldn't directly invoke.
    self.elements = self.cascade.elements
    self.read = read_pos or 1
    self.written = self.cascade.written
@@ -58,9 +58,9 @@ end
 --Use/process next element of Q
 function Queue:use()
    self.updated = true
-   local msg = nil
+   local element = nil
    if self.last_op ~= "stop" then
-      msg = self.elements[self.read]
+      element = self.elements[self.read]
       if self.read == self.written then
          self.last_op = "stop"
          if self.cascade ~= nil then self:grow() end
@@ -70,7 +70,7 @@ function Queue:use()
          if self.read == 0 then self.read = self.size end --Needed bc Lua's 1st element is 1 not 0
       end
    end
-   return msg
+   return element
 end
 
 --Look at (next + n) element without advancing the Q.
@@ -94,7 +94,7 @@ function Queue:peek(nth)
 end
 
 --Peek through elements in Q, returning table of elements that returned true
---when passed to function "fun".
+--when passed to function "filter".
 function Queue:search(filter, ...)
    local hits = {}
    if filter ~= nil then --Gotta provide a function that returns a boolean
